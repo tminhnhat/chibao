@@ -1,0 +1,30 @@
+lenh long
+
+
+trade:binanfu:close symbol=BNB/BUSD cancelall=true
+trade:binanfu:long leverage={{plot("tylemargin")}} type=isolated symbol=BNB/BUSD size={{plot("giatrivaolenh")}} price={{plot("giavaoentrylong")}} stoptrigger={{plot("giastoplosslong")}}
+
+trade:binanfu:stoploss symbol=BNB/BUSD stoptrigger={{plot("giastoplosslong")}}
+
+lenh short
+
+trade:binanfu:close symbol=BNB/BUSD cancelall=true
+trade:binanfu:short leverage={{plot("tylemargin")}} type=isolated symbol=BNB/BUSD size={{plot("giatrivaolenh")}} price={{plot("giavaoentryshort")}} stoptrigger={{plot("giastoplossshort")}}
+
+trade:binanfu:stoploss symbol=BNB/BUSD stoptrigger={{plot("giastoplossshort")}}
+
+http://54.169.114.191/frostybot
+
+
+cancelall=true stoptrigger=-10% profittrigger=+5% reduce=true
+
+
+long percent
+
+trade:binanfu:close symbol=BNB/BUSD cancelall=true
+trade:binanfu:long leverage=5 type=isolated symbol=BNB/BUSD size=100 price=-0.05% stoptrigger=-3% profittrigger=+10% cancelall=true
+
+lenh short
+trade:binanfu:cancelall symbol=BNB/BUSD
+trade:binanfu:close symbol=BNB/BUSD cancelall=true
+trade:binanfu:short leverage=5 type=isolated symbol=BNB/BUSD size=100 price=+0.05% stoptrigger=+3% profittrigger=-10% cancelall=true

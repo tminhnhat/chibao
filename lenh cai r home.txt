@@ -1,0 +1,2 @@
+lenh cai r_home
+apt-get install r-base-core
