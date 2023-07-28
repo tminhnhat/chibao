@@ -1,6 +1,6 @@
 //@version=5
 
-strategy('CODE AI MOD dev 4', overlay=true, initial_capital=1000)
+strategy('CODE AI MOD dev 4 v4.2', overlay=true, initial_capital=1000)
 
 // Setting 
 
@@ -14,13 +14,17 @@ loaimargin = input.string(title="Loai Margin", defval="isolated", options=["isol
 donbay = input.int(title="Don bay", defval=10, group="Setting")
 risk = input.float(2, title="Risk per Trade %", group="Setting", step=0.5)
 ruiromax = input.float(2, title="rui ro % MAX", group="Setting", step=0.1)
+biendotrail2 = input.float(0.01, title="% bien do trail 2 so voi stoploss", group="Setting", step=0.01)
 typeSL = input.string(title="StopLoss", defval="ATR", options=["Swing", "ATR"], group="Setting")
 
-typeTP = input.string(title="TakeProfit", defval="R:R", options=["R:R", "Multiple Target"], group="Setting")
+typeTP = input.string(title="TakeProfit", defval="R:R", options=["R:R", "Multiple Target", "Mix", "TrailStop2"], group="Setting")
 trendA = input.string(title="Trend Indicator", defval="EMA", options=["EMA", "Superichi"], group="Setting")
 _x = input.bool(false, title="do not take too small positions", group="Setting", tooltip="This parameter is used to avoid positions that have a stoploss too close to the entry point and that the broker's spreads take all the gains")
+onlyshort = input.bool(true, title="Only Short", group="Setting", tooltip="chi vao lenh short")
+onlylong = input.bool(true, title="Only Long", group="Setting", tooltip="chi vao lenh Long")
 security = input.float(10, title="min of pips (00001.00)", group="Setting")
 
+srctrail = input.source(close, title="Source Trail", group="Setting")
 riskt = risk / 100 + 1
 
 
@@ -649,8 +653,7 @@ cloud_b = color.new(color.red,50)
 
 //Alert
 
-getpips() =>
-    syminfo.mintick * (syminfo.type == "crypto" ? 5 : 1)
+
 
 
 
@@ -676,7 +679,11 @@ mess_sellMP1 = "trade:" + sancoin + ":short leverage=" + str.tostring(donbay) + 
 mess_sellMP2 = "trade:" + sancoin + ":short leverage=" + str.tostring(donbay) + " symbol=" + str.tostring(capcoin) + str.tostring(loaigiaban) + " stoptrigger=" + str.tostring(swingHigh) + " profittrigger=" + str.tostring(close-((swingHigh-close)*target2)) + " size=" + str.tostring(risk*donbay/2) + "%"
 mess_sellMP3 = "trade:" + sancoin + ":short leverage=" + str.tostring(donbay) + " symbol=" + str.tostring(capcoin) + str.tostring(loaigiaban) + " stoptrigger=" + str.tostring(swingHigh) + " profittrigger=" + str.tostring(close-((swingHigh-close)*target3)) + " size=" + str.tostring(risk*donbay/2) + "%"
 
-mess_quayxe = "trade:" + sancoin + ":close" + " symbol=" + str.tostring(capcoin) + " cancelall=true"
+mess_buytrail = "trade:" + sancoin + ":long leverage=" + str.tostring(donbay) + " symbol=" + str.tostring(capcoin) + str.tostring(loaigiamua) + " stoptrigger=" + str.tostring(atrBuy) + " size=" + str.tostring(risk*donbay) + "%" + " cancelall=true"
+
+mess_selltrail = "trade:" + sancoin + ":short leverage=" + str.tostring(donbay) + " symbol=" + str.tostring(capcoin) + str.tostring(loaigiaban) + " stoptrigger=" + str.tostring(atrSell) + " size=" + str.tostring(risk*donbay) + "%" + " cancelall=true"
+
+mess_quayxe = "trade:" + sancoin + ":close" + " symbol=" + str.tostring(capcoin) + " cancelall=true reduce=true"
 
 // Strategy
     
@@ -687,8 +694,14 @@ float takeProfit1 = na
 float takeProfit2 = na
 float takeProfit3 = na
 float entry_price = na
-
-
+float biendotrailbuy = na
+float kichhoattrailbuy = na
+float biendotrailsell = na
+float kichhoattrailsell = na
+float longStopPrice = na
+float shortStopPrice = na
+float stopValue = na
+float stoplosstrail = na
 
 string mess_doistoplossbuy1 = na
 string mess_doistoplossbuy2 = na
@@ -707,6 +720,10 @@ string mess_doistoplossbuyrr2 = na
 string mess_doistoplosssellrr1 = na
 string mess_doistoplosssellrr2 = na
 
+string mess_doistoplosstrail2 = na
+
+string mess_trailstopbuy = na
+string mess_trailstopsell = na
 bool longcondition = na
 bool shortcondition = na
 
@@ -735,44 +752,44 @@ if typeSL == "ATR"
 
     if typeTP == "Multiple Target"
     
-        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow 
-            strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe)
+        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow and onlylong
+            strategy.close_all(comment = "Quay xe")
 			risk_long := (close - atrBuy) / close
             minp = close - atrBuy
             
             if _x 
                 strategy.entry("long", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buyAMP1, when = minp > security)
-                alert(mess_buyAMP2, alert.freq_once_per_bar_close)					
-                alert(mess_buyAMP3, alert.freq_once_per_bar_close)					
+                alert(mess_buyAMP2, alert.freq_once_per_bar)					
+                alert(mess_buyAMP3, alert.freq_once_per_bar)					
 				
             else 
                 strategy.entry("long", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buyAMP1)
-                alert(mess_buyAMP2, alert.freq_once_per_bar_close)	
-                alert(mess_buyAMP3, alert.freq_once_per_bar_close)	
+                alert(mess_buyAMP2, alert.freq_once_per_bar)	
+                alert(mess_buyAMP3, alert.freq_once_per_bar)	
                 
         
-        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow 
-            strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe)
+        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow and onlyshort
+            strategy.close_all(comment = "Quay xe")
 			risk_short := (atrSell - close) / close 
             minp = atrSell - close
             
             if _x 
 
                 strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellAMP1, when = minp > security)
-                alert(mess_sellAMP2, alert.freq_once_per_bar_close)                    
-                alert(mess_sellAMP3, alert.freq_once_per_bar_close)                    
+                alert(mess_sellAMP2, alert.freq_once_per_bar)                    
+                alert(mess_sellAMP3, alert.freq_once_per_bar)                    
 				
             else 
 
                 strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellAMP1)
-                alert(mess_sellAMP2, alert.freq_once_per_bar_close)                    
-                alert(mess_sellAMP3, alert.freq_once_per_bar_close)                    
+                alert(mess_sellAMP2, alert.freq_once_per_bar)                    
+                alert(mess_sellAMP3, alert.freq_once_per_bar)                    
 
     
     if typeTP == "R:R"
     
         if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow 
-            strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe)
+            strategy.close_all(comment = "Quay xe")
 			risk_long := (close - atrBuy) / close
             minp = close - atrBuy
             
@@ -787,7 +804,7 @@ if typeSL == "ATR"
 
         
         if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow 
-            strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe)
+            strategy.close_all(comment = "Quay xe")
 			risk_short := (atrSell - close) / close 
             minp = atrSell - close
          
@@ -800,50 +817,120 @@ if typeSL == "ATR"
                 strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellAP)
 
 
+
+    
+    if typeTP == "TrailStop2"
+    
+        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow 
+            strategy.close_all(comment = "Quay xe")
+			risk_long := (close - atrBuy) / close
+            minp = close - atrBuy
+            
+            if _x 
+
+                strategy.entry("long", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buytrail, when = minp > security)                
+			
+			else 
+
+				strategy.entry("long", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buytrail)
+
+
+        
+        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow 
+            strategy.close_all(comment = "Quay xe")
+			risk_short := (atrSell - close) / close 
+            minp = atrSell - close
+         
+            if _x 
+
+                strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_selltrail, when = minp > security)
+                    
+			else 
+
+                strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_selltrail)
+
+
+
+    if typeTP == "Mix"
+    
+        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow and onlylong
+            strategy.close_all(comment = "Quay xe")
+			risk_long := (close - atrBuy) / close
+            minp = close - atrBuy
+            
+            if _x 
+                strategy.entry("long", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buyAMP1, when = minp > security)
+                alert(mess_buyAMP2, alert.freq_once_per_bar)					
+                alert(mess_buyAMP3, alert.freq_once_per_bar)					
+                strategy.entry("long2", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buytrail, when = minp > security)                
+            else 
+                strategy.entry("long", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buyAMP1)
+                alert(mess_buyAMP2, alert.freq_once_per_bar)	
+                alert(mess_buyAMP3, alert.freq_once_per_bar)	
+                strategy.entry("long2", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buytrail)                
+        
+        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow and onlyshort
+            strategy.close_all(comment = "Quay xe")
+			risk_short := (atrSell - close) / close 
+            minp = atrSell - close
+            
+            if _x 
+
+                strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellAMP1, when = minp > security)
+                alert(mess_sellAMP2, alert.freq_once_per_bar)                    
+                alert(mess_sellAMP3, alert.freq_once_per_bar)                    
+                strategy.entry("short2", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_selltrail, when = minp > security)
+            else 
+
+                strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellAMP1)
+                alert(mess_sellAMP2, alert.freq_once_per_bar)                    
+                alert(mess_sellAMP3, alert.freq_once_per_bar)                    
+                strategy.entry("short2", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_selltrail)
+
     
 if typeSL == "Swing"
 
     if typeTP == "Multiple Target"
     
-        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow 
-            strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe)
+        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow and onlylong
+            strategy.close_all(comment = "Quay xe")
 			risk_long := (close - swingLow) / close
             minp = close - swingLow
             
             if _x 
 
                 strategy.entry("long", strategy.long, qty=lotB, comment="Buy " + str.tostring(close) + "", alert_message = mess_buyMP1, when = minp > security)
-                alert(mess_buyMP2, alert.freq_once_per_bar_close)                   
-                alert(mess_buyMP3, alert.freq_once_per_bar_close)                   
+                alert(mess_buyMP2, alert.freq_once_per_bar)                   
+                alert(mess_buyMP3, alert.freq_once_per_bar)                   
 
             else 
 
                 strategy.entry("long", strategy.long, qty=lotB, comment="Buy " + str.tostring(close) + "", alert_message = mess_buyMP1)
-                alert(mess_buyMP2, alert.freq_once_per_bar_close)                   
-                alert(mess_buyMP3, alert.freq_once_per_bar_close)                   
+                alert(mess_buyMP2, alert.freq_once_per_bar)                   
+                alert(mess_buyMP3, alert.freq_once_per_bar)                   
 
        
-        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow 
-            strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe)
+        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow and onlyshort
+            strategy.close_all(comment = "Quay xe")
 			risk_short := (swingHigh - close) / close  
             minp = swingHigh - close
             
             if _x 
 
                 strategy.entry("short", strategy.short, qty=lotS, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellMP1, when = minp > security)
-                alert(mess_sellMP2, alert.freq_once_per_bar_close)                        
-                alert(mess_sellMP3, alert.freq_once_per_bar_close)                        
+                alert(mess_sellMP2, alert.freq_once_per_bar)                        
+                alert(mess_sellMP3, alert.freq_once_per_bar)                        
 
             else 
 
                 strategy.entry("short", strategy.short, qty=lotS, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellMP1)
-                alert(mess_sellMP2, alert.freq_once_per_bar_close)                       
-                alert(mess_sellMP3, alert.freq_once_per_bar_close)                       
+                alert(mess_sellMP2, alert.freq_once_per_bar)                       
+                alert(mess_sellMP3, alert.freq_once_per_bar)                       
                     
     if typeTP == "R:R"
 
-        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow 
-            strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe)
+        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow and onlylong
+            strategy.close_all(comment = "Quay xe")
 			risk_long := (close - swingLow) / close
             minp = close - swingLow
         
@@ -857,8 +944,8 @@ if typeSL == "Swing"
 
  
        
-        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow 
-            strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe)
+        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow and onlyshort
+            strategy.close_all(comment = "Quay xe")
 			risk_short := (swingHigh - close) / close  
             minp = swingHigh - close
   
@@ -869,6 +956,74 @@ if typeSL == "Swing"
 			else 
 
                 strategy.entry("short", strategy.short, qty=lotS, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellP)
+
+    if typeTP == "Mix"
+    
+        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow and onlylong
+            strategy.close_all(comment = "Quay xe")
+			risk_long := (close - swingLow) / close
+            minp = close - swingLow
+            
+            if _x 
+                strategy.entry("long", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buyAMP1, when = minp > security)
+                alert(mess_buyAMP2, alert.freq_once_per_bar)					
+                alert(mess_buyAMP3, alert.freq_once_per_bar)					
+                strategy.entry("long2", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buytrail, when = minp > security)                
+            else 
+                strategy.entry("long", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buyAMP1)
+                alert(mess_buyAMP2, alert.freq_once_per_bar)	
+                alert(mess_buyAMP3, alert.freq_once_per_bar)	
+                strategy.entry("long2", strategy.long, qty=lotB1, comment="Buy " + str.tostring(close) + "", alert_message = mess_buytrail)                
+        
+        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow and onlyshort
+            strategy.close_all(comment = "Quay xe")
+			risk_short := (swingHigh - close) / close 
+            minp = swingHigh - close
+            
+            if _x 
+
+                strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellAMP1, when = minp > security)
+                alert(mess_sellAMP2, alert.freq_once_per_bar)                    
+                alert(mess_sellAMP3, alert.freq_once_per_bar)                    
+                strategy.entry("short2", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_selltrail, when = minp > security)
+            else 
+
+                strategy.entry("short", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_sellAMP1)
+                alert(mess_sellAMP2, alert.freq_once_per_bar)                    
+                alert(mess_sellAMP3, alert.freq_once_per_bar)                    
+                strategy.entry("short2", strategy.short, qty=lotS1, comment="Sell " + str.tostring(close) + "", alert_message = mess_selltrail)
+
+    if typeTP == "TrailStop2"
+
+        if (strategy.position_size == 0 or strategy.position_size[1] < 0) and longcondition and inTradeWindow and onlylong
+            strategy.close_all(comment = "Quay xe")
+			risk_long := (close - swingLow) / close
+            minp = close - swingLow
+        
+            if _x 
+
+                strategy.entry("long", strategy.long, qty=lotB, comment="Buy " + str.tostring(close) + "", alert_message = mess_buytrail, when = minp > security)
+                    
+			else 
+
+                strategy.entry("long", strategy.long, qty=lotB, comment="Buy " + str.tostring(close) + "", alert_message = mess_buytrail)
+
+ 
+       
+        if (strategy.position_size == 0 or strategy.position_size[1] > 0) and shortcondition and inTradeWindow and onlyshort
+            strategy.close_all(comment = "Quay xe")
+			risk_short := (swingHigh - close) / close  
+            minp = swingHigh - close
+  
+            if _x 
+
+                strategy.entry("short", strategy.short, qty=lotS, comment="Sell " + str.tostring(close) + "", alert_message = mess_selltrail, when = minp > security)
+
+			else 
+
+                strategy.entry("short", strategy.short, qty=lotS, comment="Sell " + str.tostring(close) + "", alert_message = mess_selltrail)
+
+
 
     
 if typeTP == "Multiple Target"
@@ -886,36 +1041,37 @@ if typeTP == "Multiple Target"
 
 
 //mess doi stoploss
-		mess_doistoplossbuy1 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(entry_price)
+		mess_doistoplossbuy1 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((entry_price + stopLoss)/2)
 		mess_doistoplossbuy2 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((entry_price + takeProfit1)/2)
 		mess_doistoplossbuy3 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(takeProfit1)
 		mess_doistoplossbuy4 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((takeProfit1 + takeProfit2)/2)
 		mess_doistoplossbuy5 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(takeProfit2)
 			
-		strategy.exit("Exit 1", "long", limit = takeProfit1, qty_percent=34, comment_profit = "TP1 ✅")
+		strategy.exit("Exit 1", "long", limit = takeProfit1, qty_percent=50, comment_profit = "TP1 ✅")
 
-        if ta.crossover(high, (takeProfit1 + entry_price)/2)
-			alert(mess_doistoplossbuy1, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 1", "long", stop = entry_price, limit = takeProfit1, qty_percent=34, comment_profit = "TP1 ✅", comment_loss = "Hoa von")
+//        if ta.crossover(high, (takeProfit1 + entry_price)/2)
+//			alert(mess_doistoplossbuy1, alert.freq_once_per_bar)
+//			strategy.exit("Exit 1", "long", stop = (entry_price + stopLoss)/2, limit = takeProfit1, qty_percent=40, comment_profit = "TP1 ✅", comment_loss = "Hoa von")
 
         if ta.crossover(high, takeProfit1)
-			alert(mess_doistoplossbuy2, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 2", "long", stop = ((takeProfit1 + entry_price)/2), limit = takeProfit2, qty_percent = 33, comment_profit = "TP2 ✅", comment_loss = "TP1/2")
-        if ta.crossover(high, (takeProfit1 + takeProfit2)/2)
-			alert(mess_doistoplossbuy3, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 3", "long", stop = takeProfit1, limit = takeProfit2, qty_percent = 33, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1")
-        if ta.crossover(high, ((((takeProfit1 + takeProfit2)/2) + takeProfit2)/2))
-			alert(mess_doistoplossbuy4, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 4", "long", stop = ((takeProfit1 + takeProfit2)/2), limit = takeProfit2, qty_percent = 33, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP2/2")
+			alert(mess_doistoplossbuy2, alert.freq_once_per_bar)
+			strategy.exit("Exit 2", "long", stop = ((takeProfit1 + entry_price)/2), limit = takeProfit2, qty_percent = 50, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1/2")
+//       if ta.crossover(high, (takeProfit1 + takeProfit2)/2)
+//			alert(mess_doistoplossbuy3, alert.freq_once_per_bar)
+//			strategy.exit("Exit 3", "long", stop = takeProfit1, limit = takeProfit2, qty_percent = 50, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1")
+        if ta.crossover(high, takeProfit2)
+			alert(mess_doistoplossbuy3, alert.freq_once_per_bar)
+//			strategy.exit("Exit 4", "long", stop = ((takeProfit1 + takeProfit2)/2), limit = takeProfit3, qty_percent = 100, comment_profit = "TP3 ✅", comment_loss = "Hoa von TP2/2")
+//       if ta.crossover(high, (takeProfit3 + takeProfit2)/2)
+//			alert(mess_doistoplossbuy5, alert.freq_once_per_bar)
+			strategy.exit("Exit 3", "long", stop = takeProfit2, limit = takeProfit3, qty_percent = 100, comment_profit = "TP3 ✅", comment_loss = "Hoa von TP2")
         if ta.crossover(high, (takeProfit3 + takeProfit2)/2)
-			alert(mess_doistoplossbuy5, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 5", "long", stop = takeProfit2, limit = takeProfit3, qty_percent = 33, comment_profit = "TP3 ✅", comment_loss = "TP2")
-
+			alert(mess_doistoplossbuy5, alert.freq_once_per_bar)
 //		if startShortTrade
 //			strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe, immediately= true)
 		else 
-            strategy.exit("Exit 1", "long", stop = stopLoss, qty_percent = 100, comment_loss = "SL ❌")
-    
+            strategy.exit("Exit 1", "long", stop = stopLoss, qty_percent = 100, comment_loss = "SL ❌", alert_message = str.tostring(capcoin) + "het tien roi")
+			
     if strategy.position_size < 0
     
         stopLoss := strategy.position_avg_price * (1 + risk_short)
@@ -925,35 +1081,35 @@ if typeTP == "Multiple Target"
         entry_price := strategy.position_avg_price
 
 
-		mess_doistoplosssell1 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(entry_price)
+		mess_doistoplosssell1 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((entry_price + stopLoss)/2)
 		mess_doistoplosssell2 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((entry_price + takeProfit1)/2)
 		mess_doistoplosssell3 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(takeProfit1)
 		mess_doistoplosssell4 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((takeProfit1 + takeProfit2)/2)
 		mess_doistoplosssell5 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(takeProfit2)
 			
-		strategy.exit("Exit 1", "short", limit = takeProfit1, qty_percent = 34, comment_profit = "TP1 ✅")
+		strategy.exit("Exit 1", "short", limit = takeProfit1, qty_percent = 50, comment_profit = "TP1 ✅")
             
-		if ta.crossunder(low, (takeProfit1 + entry_price)/2)
-			alert(mess_doistoplosssell1, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 1", "short", stop = entry_price, limit = takeProfit1, qty_percent = 34, comment_profit = "TP2 ✅", comment_loss = "Hoa von")
+//		if ta.crossunder(low, (takeProfit1 + entry_price)/2)
+//			alert(mess_doistoplosssell1, alert.freq_once_per_bar)
+//			strategy.exit("Exit 1", "short", stop = (entry_price + stopLoss)/2, limit = takeProfit1, qty_percent = 40, comment_profit = "TP2 ✅", comment_loss = "Hoa von")
         if ta.crossunder(low, takeProfit1)
-			alert(mess_doistoplosssell2, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 2", "short", stop = ((takeProfit1 + entry_price)/2), limit = takeProfit2, qty_percent = 33, comment_profit = "TP2 ✅", comment_loss = "TP1/2")
-        if ta.crossunder(low, (takeProfit1 + takeProfit2)/2)
-			alert(mess_doistoplosssell3, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 3", "short", stop = takeProfit1, limit = takeProfit2, qty_percent = 33, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1")
-        if ta.crossunder(low, ((((takeProfit1 + takeProfit2)/2) + takeProfit2)/2))
-			alert(mess_doistoplosssell4, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 4", "short", stop = ((takeProfit1 + takeProfit2)/2), limit = takeProfit2, qty_percent = 33, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP2/2")
-        if ta.crossunder(low, (takeProfit3 + takeProfit2)/2)
-			alert(mess_doistoplosssell5, alert.freq_once_per_bar_close)
-			strategy.exit("Exit 5", "short", stop = takeProfit2, limit = takeProfit3, qty_percent = 33, comment_profit = "TP3 ✅", comment_loss = "TP2")
+			alert(mess_doistoplosssell2, alert.freq_once_per_bar)
+			strategy.exit("Exit 2", "short", stop = ((takeProfit1 + entry_price)/2), limit = takeProfit2, qty_percent = 50, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1/2")
+//        if ta.crossunder(low, (takeProfit1 + takeProfit2)/2)
+//			alert(mess_doistoplosssell3, alert.freq_once_per_bar)
+//			strategy.exit("Exit 3", "short", stop = takeProfit1, limit = takeProfit2, qty_percent = 50, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1")
+        if ta.crossunder(low, takeProfit2)
+			alert(mess_doistoplosssell3, alert.freq_once_per_bar)
+//			strategy.exit("Exit 4", "short", stop = ((takeProfit1 + takeProfit2)/2), limit = takeProfit3, qty_percent = 100, comment_profit = "TP3 ✅", comment_loss = "Hoa von TP2/2")
 
+			strategy.exit("Exit 3", "short", stop = takeProfit2, limit = takeProfit3, qty_percent = 100, comment_profit = "TP3 ✅", comment_loss = "Hoa von TP2")
+        if ta.crossunder(low, (takeProfit3 + takeProfit2)/2)
+			alert(mess_doistoplosssell5, alert.freq_once_per_bar)
 //		if startLongTrade
 //			strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe, immediately= true)
 		else 
-            strategy.exit("Exit 1", "short", stop = stopLoss, qty_percent = 100, comment_loss = "SL ❌")
-            
+            strategy.exit("Exit 1", "short", stop = stopLoss, qty_percent = 100, comment_loss = "SL ❌", alert_message = str.tostring(capcoin) + "het tien roi")
+
 if typeTP == "R:R"
 
     if strategy.position_size > 0
@@ -969,10 +1125,10 @@ if typeTP == "R:R"
         strategy.exit("Exit long", "long", stop = stopLoss, limit = takeProfit1, comment_profit="TP ✅", comment_loss="SL ❌")
 
         if ta.crossover(high, (takeProfit1 + entry_price)/2)
-			alert(mess_doistoplossbuyrr1, alert.freq_once_per_bar_close)
+			alert(mess_doistoplossbuyrr1, alert.freq_once_per_bar)
 
         if ta.crossover(high, (((takeProfit1 + entry_price)/2) + takeProfit1)/2)
-			alert(mess_doistoplossbuyrr2, alert.freq_once_per_bar_close)
+			alert(mess_doistoplossbuyrr2, alert.freq_once_per_bar)
 //		if startShortTrade
 //			strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe, immediately= true)
 
@@ -988,12 +1144,165 @@ if typeTP == "R:R"
             
 		strategy.exit("Exit short", "short", stop = stopLoss, limit = takeProfit1, comment_profit="TP ✅" , comment_loss="SL ❌")         
         if ta.crossunder(low, (takeProfit1 + entry_price)/2)
-			alert(mess_doistoplosssellrr1, alert.freq_once_per_bar_close)
+			alert(mess_doistoplosssellrr1, alert.freq_once_per_bar)
 
         if ta.crossunder(low, (((takeProfit1 + entry_price)/2) + takeProfit1)/2)
-			alert(mess_doistoplosssellrr2, alert.freq_once_per_bar_close)
+			alert(mess_doistoplosssellrr2, alert.freq_once_per_bar)
 //		if startLongTrade
 //			strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe, immediately= true)
+if typeTP == "Mix"
+
+	longStopPrice := if (strategy.position_size > 0)
+		stopLoss := strategy.position_avg_price * (1 - risk_long)
+		stopValue := srctrail * (1 - biendotrail2)
+		math.max(stopValue, longStopPrice[1], stopLoss)
+	else
+		close*0.9
+
+	shortStopPrice := if (strategy.position_size < 0)
+		stopLoss := strategy.position_avg_price * (1 + risk_short)
+		stopValue := srctrail * (1 + biendotrail2)
+		math.min(stopValue, shortStopPrice[1], stopLoss)
+	else
+		close*1.1
+
+        
+    if strategy.position_size > 0
+
+        stopLoss := strategy.position_avg_price * (1 - risk_long)
+        takeProfit1 := strategy.position_avg_price * (1 + target1 * risk_long)
+        takeProfit2 := strategy.position_avg_price * (1 + target2 * risk_long)
+        takeProfit3 := strategy.position_avg_price * (1 + target3 * risk_long)
+		
+        entry_price := strategy.position_avg_price
+
+
+//mess doi stoploss
+		mess_doistoplossbuy1 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((entry_price + stopLoss)/2)
+		mess_doistoplossbuy2 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((entry_price + takeProfit1)/2)
+		mess_doistoplossbuy3 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(takeProfit1)
+		mess_doistoplossbuy4 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((takeProfit1 + takeProfit2)/2)
+		mess_doistoplossbuy5 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(takeProfit2)
+			
+		strategy.exit("Exit 1", "long", limit = takeProfit1, qty_percent=50, comment_profit = "TP1 ✅")
+
+//        if ta.crossover(high, (takeProfit1 + entry_price)/2)
+//			alert(mess_doistoplossbuy1, alert.freq_once_per_bar)
+//			strategy.exit("Exit 1", "long", stop = (entry_price + stopLoss)/2, limit = takeProfit1, qty_percent=40, comment_profit = "TP1 ✅", comment_loss = "Hoa von")
+
+        if ta.crossover(high, takeProfit1)
+			alert(mess_doistoplossbuy2, alert.freq_once_per_bar)
+			strategy.exit("Exit 2", "long", stop = ((takeProfit1 + entry_price)/2), limit = takeProfit2, qty_percent = 50, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1/2")
+//       if ta.crossover(high, (takeProfit1 + takeProfit2)/2)
+//			alert(mess_doistoplossbuy3, alert.freq_once_per_bar)
+//			strategy.exit("Exit 3", "long", stop = takeProfit1, limit = takeProfit2, qty_percent = 50, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1")
+        if ta.crossover(high, takeProfit2)
+			alert(mess_doistoplossbuy3, alert.freq_once_per_bar)
+//			strategy.exit("Exit 4", "long", stop = ((takeProfit1 + takeProfit2)/2), limit = takeProfit3, qty_percent = 100, comment_profit = "TP3 ✅", comment_loss = "Hoa von TP2/2")
+//       if ta.crossover(high, (takeProfit3 + takeProfit2)/2)
+//			alert(mess_doistoplossbuy5, alert.freq_once_per_bar)
+			strategy.exit("Exit 3", "long", stop = takeProfit2, limit = takeProfit3, qty_percent = 100, comment_profit = "TP3 ✅", comment_loss = "Hoa von TP2")
+        if ta.crossover(high, (takeProfit3 + takeProfit2)/2)
+			alert(mess_doistoplossbuy5, alert.freq_once_per_bar)
+//		if startShortTrade
+//			strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe, immediately= true)
+		else 
+            strategy.exit("Exit 1", "long", stop = stopLoss, qty_percent = 100, comment_loss = "SL ❌", alert_message = str.tostring(capcoin) + "het tien roi")
+
+//mess doi stoploss
+		mess_doistoplosstrail2 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(longStopPrice)
+			
+		strategy.exit("Exit", "long2", stop = longStopPrice, qty_percent=100, comment_profit = "Run trail ✅", comment_loss = "SL")
+		if longStopPrice > longStopPrice[1]
+			alert(mess_doistoplosstrail2, alert.freq_once_per_bar_close)
+			
+    if strategy.position_size < 0
+    
+        stopLoss := strategy.position_avg_price * (1 + risk_short)
+        takeProfit1 := strategy.position_avg_price * (1 - target1 * risk_short)
+        takeProfit2 := strategy.position_avg_price * (1 - target2 * risk_short)
+        takeProfit3 := strategy.position_avg_price * (1 - target3 * risk_short)
+        entry_price := strategy.position_avg_price
+
+
+		mess_doistoplosssell1 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((entry_price + stopLoss)/2)
+		mess_doistoplosssell2 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((entry_price + takeProfit1)/2)
+		mess_doistoplosssell3 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(takeProfit1)
+		mess_doistoplosssell4 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring((takeProfit1 + takeProfit2)/2)
+		mess_doistoplosssell5 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(takeProfit2)
+			
+		strategy.exit("Exit 1", "short", limit = takeProfit1, qty_percent = 50, comment_profit = "TP1 ✅")
+            
+//		if ta.crossunder(low, (takeProfit1 + entry_price)/2)
+//			alert(mess_doistoplosssell1, alert.freq_once_per_bar)
+//			strategy.exit("Exit 1", "short", stop = (entry_price + stopLoss)/2, limit = takeProfit1, qty_percent = 40, comment_profit = "TP2 ✅", comment_loss = "Hoa von")
+        if ta.crossunder(low, takeProfit1)
+			alert(mess_doistoplosssell2, alert.freq_once_per_bar)
+			strategy.exit("Exit 2", "short", stop = ((takeProfit1 + entry_price)/2), limit = takeProfit2, qty_percent = 50, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1/2")
+//        if ta.crossunder(low, (takeProfit1 + takeProfit2)/2)
+//			alert(mess_doistoplosssell3, alert.freq_once_per_bar)
+//			strategy.exit("Exit 3", "short", stop = takeProfit1, limit = takeProfit2, qty_percent = 50, comment_profit = "TP2 ✅", comment_loss = "Hoa von TP1")
+        if ta.crossunder(low, takeProfit2)
+			alert(mess_doistoplosssell3, alert.freq_once_per_bar)
+//			strategy.exit("Exit 4", "short", stop = ((takeProfit1 + takeProfit2)/2), limit = takeProfit3, qty_percent = 100, comment_profit = "TP3 ✅", comment_loss = "Hoa von TP2/2")
+
+			strategy.exit("Exit 3", "short", stop = takeProfit2, limit = takeProfit3, qty_percent = 100, comment_profit = "TP3 ✅", comment_loss = "Hoa von TP2")
+        if ta.crossunder(low, (takeProfit3 + takeProfit2)/2)
+			alert(mess_doistoplosssell5, alert.freq_once_per_bar)
+//		if startLongTrade
+//			strategy.close_all(comment = "Quay xe", alert_message = mess_quayxe, immediately= true)
+		else 
+            strategy.exit("Exit 1", "short", stop = stopLoss, qty_percent = 100, comment_loss = "SL ❌", alert_message = str.tostring(capcoin) + "het tien roi")
+
+		mess_doistoplosstrail2 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(shortStopPrice)
+				
+
+		strategy.exit("Exit", "short2", stop = shortStopPrice, qty_percent=100, comment_profit = "Run trail ✅", comment_loss = "SL")
+		if shortStopPrice < shortStopPrice[1]
+			alert(mess_doistoplosstrail2, alert.freq_once_per_bar_close)
+
+if typeTP == "TrailStop2"
+
+
+	longStopPrice := if (strategy.position_size > 0)
+		stopLoss := strategy.position_avg_price * (1 - risk_long)
+		stopValue := srctrail * (1 - biendotrail2)
+		math.max(stopValue, longStopPrice[1], stopLoss)
+	else
+		close*0.9
+
+	shortStopPrice := if (strategy.position_size < 0)
+		stopLoss := strategy.position_avg_price * (1 + risk_short)
+		stopValue := srctrail * (1 + biendotrail2)
+		math.min(stopValue, shortStopPrice[1], stopLoss)
+	else
+		close*1.1
+	
+	if strategy.position_size > 0
+	
+//mess doi stoploss
+		mess_doistoplosstrail2 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(longStopPrice)
+			
+		strategy.exit("Exit", "long", stop = longStopPrice, qty_percent=100, comment_profit = "Run trail ✅", comment_loss = "SL")
+		if longStopPrice > longStopPrice[1]
+			alert(mess_doistoplosstrail2, alert.freq_once_per_bar_close)
+
+
+    if strategy.position_size < 0
+    
+
+//mess doi stoploss
+		mess_doistoplosstrail2 := "trade:" + sancoin + ":stoploss" + " symbol=" + str.tostring(capcoin) + " stopsize=100%" + " stoptrigger=" + str.tostring(shortStopPrice)
+				
+
+		strategy.exit("Exit", "short", stop = shortStopPrice, qty_percent=100, comment_profit = "Run trail ✅", comment_loss = "SL")
+        if shortStopPrice < shortStopPrice[1]
+			alert(mess_doistoplosstrail2, alert.freq_once_per_bar_close)
+
+
+
+			
+
 //plot
 
 trendema = trendA == "EMA" ? ema : na
@@ -1019,24 +1328,39 @@ plot(exatrB, color=color.new(color.white, 60), title='ATR')
 
 p_ep = plot(entry_price, color=color.new(color.white, 0), linewidth=2, style=plot.style_linebr, title='entry price')
 p_sl = plot(stopLoss, color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr, title='stopLoss')
-p_tp2 = plot(takeProfit2, color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr, title='takeProfit1')
-p_tp1 = plot(takeProfit1, color=color.new(#52F071, 0), linewidth=1, style=plot.style_linebr, title='takeProfit2')
+p_tp2 = plot(takeProfit2, color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr, title='takeProfit2')
+p_tp1 = plot(takeProfit1, color=color.new(#52F071, 0), linewidth=1, style=plot.style_linebr, title='takeProfit1')
+p_tp3 = plot(takeProfit3, color=color.new(#52F071, 0), linewidth=1, style=plot.style_linebr, title='takeProfit3')
+p_kickhoattrailbuy = plot(kichhoattrailbuy, color=color.new(color.blue, 0), linewidth=1, style=plot.style_linebr, title='Kich hoat trail buy')
+p_kickhoattrailsell = plot(kichhoattrailsell, color=color.new(color.blue, 0), linewidth=1, style=plot.style_linebr, title='Kich hoat trail sell')
+
+p_trailstopbuy = plot(high - biendotrailbuy*syminfo.mintick, color=color.new(color.yellow, 0), linewidth=1, style=plot.style_linebr, title='trail stop buy')
+p_trailstopsell = plot(low + biendotrailsell*syminfo.mintick, color=color.new(color.white, 0), linewidth=1, style=plot.style_linebr, title='trail stop sell')
+//p_biendotrailbuy = plot(biendotrailbuy, color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr, title='bien do trail buy')
+//p_biendotrailsell = plot(biendotrailsell, color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr, title='bien do trail sell')
+
+p_stoplongtrail = plot(longStopPrice, color=color.new(color.blue, 0), linewidth=1, style=plot.style_linebr, title='Stop Long Trail 2')
+p_stopshorttrail = plot(shortStopPrice, color=color.new(color.blue, 0), linewidth=1, style=plot.style_linebr, title='Stop Short Trail 2')
+
+p_sltrail = plot(stoplosstrail, color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr, title='stopLosstrail3')
+
 fill(p_sl, p_ep, color.new(color.red, transp=85))
 fill(p_tp2, p_ep, color.new(color.green, transp=85))
 fill(p_tp1, p_ep, color.new(#52F071, transp=85))
-
+fill(p_tp3, p_ep, color.new(#52F071, transp=85))
 colorresult = strategy.netprofit > 0 ? color.green : color.red	
 profitprc = strategy.netprofit / strategy.initial_capital * 100
 periodzone = (backtestEndDate - backtestStartDate) / 3600 / 24 / 1000
 
-var tbl = table.new(position.top_right, 4, 2, border_width=3)
+var tbl = table.new(position.top_right, 4, 3, border_width=3)
 
-table.cell(tbl, 0, 0, "Symbol",  bgcolor = #9B9B9B, width = 6, height = 6)
-table.cell(tbl, 1, 0, "Net Profit", bgcolor = #9B9B9B, width = 6, height = 6)
-table.cell(tbl, 2, 0, "Trades", bgcolor = #9B9B9B, width = 6, height = 6)
-table.cell(tbl, 3, 0, "Period",  bgcolor = #9B9B9B, width = 6, height = 6)
+table.cell(tbl, 0, 0, "Symbol",  bgcolor = #9B9B9B, width = 10, height = 10)
+table.cell(tbl, 1, 0, "Net Profit", bgcolor = #9B9B9B, width = 10, height = 10)
+table.cell(tbl, 2, 0, "Trades", bgcolor = #9B9B9B, width = 10, height = 10)
+table.cell(tbl, 3, 0, "Period",  bgcolor = #9B9B9B, width = 10, height = 10)
     
-table.cell(tbl, 0, 1, str.tostring(syminfo.ticker),  bgcolor = #E8E8E8, width = 6, height = 6)
-table.cell(tbl, 1, 1, str.tostring(profitprc, format.mintick) + " %", bgcolor = colorresult,   width = 6, height = 6)
-table.cell(tbl, 2, 1, str.tostring(strategy.closedtrades), bgcolor = colorresult,   width = 6, height = 6)
-table.cell(tbl, 3, 1, str.tostring(periodzone) + " day", bgcolor = colorresult,   width = 6, height = 6)
+table.cell(tbl, 0, 1, str.tostring(syminfo.ticker),  bgcolor = #E8E8E8, width = 10, height = 10)
+table.cell(tbl, 1, 1, str.tostring(profitprc, format.mintick) + " %", bgcolor = colorresult,   width = 10, height = 10)
+table.cell(tbl, 2, 1, str.tostring(strategy.closedtrades), bgcolor = colorresult,   width = 10, height = 10)
+table.cell(tbl, 3, 1, str.tostring(periodzone) + " day", bgcolor = colorresult,   width = 10, height = 10)
+
